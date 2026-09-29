@@ -1,51 +1,45 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  createTodo,
+  deleteCompletedTodos,
+  deleteTodo,
+  fetchTodos,
+  updateTodo,
+} from './api/todos'
 import './App.css'
 
-const STORAGE_KEY = 'daylist.tasks'
 const FILTERS = ['all', 'active', 'completed']
 
-function loadTasks() {
-  try {
-    const savedTasks = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]')
-    if (!Array.isArray(savedTasks)) return []
-
-    return savedTasks.filter((task) =>
-      task &&
-      typeof task.id === 'string' &&
-      typeof task.text === 'string' &&
-      typeof task.completed === 'boolean'
-    ).map((task) => ({
-      ...task,
-      notes: typeof task.notes === 'string' ? task.notes : '',
-    }))
-  } catch {
-    return []
-  }
-}
-
-function createTaskId() {
-  return typeof window.crypto.randomUUID === 'function'
-    ? window.crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
 function App() {
-  const [tasks, setTasks] = useState(loadTasks)
+  const [tasks, setTasks] = useState([])
   const [filter, setFilter] = useState('all')
   const [taskText, setTaskText] = useState('')
   const [taskNotes, setTaskNotes] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [apiError, setApiError] = useState('')
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [editingText, setEditingText] = useState('')
   const [editingNotes, setEditingNotes] = useState('')
   const taskInputRef = useRef(null)
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
-    } catch {
-      // The list remains usable if browser storage is unavailable.
+    let ignoreResult = false
+
+    fetchTodos()
+      .then((savedTasks) => {
+        if (!ignoreResult) setTasks(savedTasks)
+      })
+      .catch((error) => {
+        if (!ignoreResult) setApiError(error.message)
+      })
+      .finally(() => {
+        if (!ignoreResult) setIsLoading(false)
+      })
+
+    return () => {
+      ignoreResult = true
     }
-  }, [tasks])
+  }, [])
 
   const today = new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
@@ -61,37 +55,56 @@ function App() {
     return true
   })
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const text = taskText.trim()
     if (!text) return
 
-    setTasks((currentTasks) => [{
-      id: createTaskId(),
-      text,
-      notes: taskNotes.trim(),
-      completed: false,
-    }, ...currentTasks])
-    setTaskText('')
-    setTaskNotes('')
-    setFilter('all')
-    taskInputRef.current?.focus()
+    try {
+      const createdTask = await createTodo({ text, notes: taskNotes.trim() })
+      setTasks((currentTasks) => [createdTask, ...currentTasks])
+      setTaskText('')
+      setTaskNotes('')
+      setFilter('all')
+      setApiError('')
+      taskInputRef.current?.focus()
+    } catch (error) {
+      setApiError(error.message)
+    }
   }
 
-  function toggleTask(taskId) {
-    setTasks((currentTasks) => currentTasks.map((task) =>
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ))
+  async function toggleTask(task) {
+    try {
+      const updatedTask = await updateTodo(task.id, { completed: !task.completed })
+      setTasks((currentTasks) => currentTasks.map((item) => (
+        item.id === task.id ? updatedTask : item
+      )))
+      setApiError('')
+    } catch (error) {
+      setApiError(error.message)
+    }
   }
 
-  function deleteTask(taskId) {
-    setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId))
-    if (editingTaskId === taskId) setEditingTaskId(null)
+  async function removeTask(taskId) {
+    try {
+      await deleteTodo(taskId)
+      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId))
+      if (editingTaskId === taskId) setEditingTaskId(null)
+      setApiError('')
+    } catch (error) {
+      setApiError(error.message)
+    }
   }
 
-  function clearCompleted() {
-    setTasks((currentTasks) => currentTasks.filter((task) => !task.completed))
-    setEditingTaskId(null)
+  async function clearCompleted() {
+    try {
+      await deleteCompletedTodos()
+      setTasks((currentTasks) => currentTasks.filter((task) => !task.completed))
+      setEditingTaskId(null)
+      setApiError('')
+    } catch (error) {
+      setApiError(error.message)
+    }
   }
 
   function startEditing(task) {
@@ -106,17 +119,21 @@ function App() {
     setEditingNotes('')
   }
 
-  function saveEdit(event, taskId) {
+  async function saveEdit(event, taskId) {
     event.preventDefault()
     const text = editingText.trim()
     if (!text) return
 
-    setTasks((currentTasks) => currentTasks.map((task) => (
-      task.id === taskId
-        ? { ...task, text, notes: editingNotes.trim() }
-        : task
-    )))
-    cancelEditing()
+    try {
+      const updatedTask = await updateTodo(taskId, { text, notes: editingNotes.trim() })
+      setTasks((currentTasks) => currentTasks.map((task) => (
+        task.id === taskId ? updatedTask : task
+      )))
+      setApiError('')
+      cancelEditing()
+    } catch (error) {
+      setApiError(error.message)
+    }
   }
 
   const emptyTitle = tasks.length === 0
@@ -197,6 +214,7 @@ function App() {
         </form>
 
         <section className="task-section" aria-label="Your tasks">
+          {apiError && <p className="api-error" role="alert">{apiError}</p>}
           <div className="list-toolbar">
             <div className="filters" role="group" aria-label="Filter tasks">
               {FILTERS.map((filterName) => (
@@ -221,7 +239,12 @@ function App() {
             </button>
           </div>
 
-          {visibleTasks.length > 0 ? (
+          {isLoading ? (
+            <div className="empty-state" role="status">
+              <p className="empty-title">Loading tasks</p>
+              <p className="empty-description">Connecting to your local API.</p>
+            </div>
+          ) : visibleTasks.length > 0 ? (
             <ul className="todo-list" aria-label="Tasks">
               {visibleTasks.map((task) => (
                 <li className={`task-item${task.completed ? ' is-complete' : ''}`} key={task.id}>
@@ -261,7 +284,7 @@ function App() {
                           type="checkbox"
                           checked={task.completed}
                           aria-label={`Mark "${task.text}" as ${task.completed ? 'not complete' : 'complete'}`}
-                          onChange={() => toggleTask(task.id)}
+                          onChange={() => toggleTask(task)}
                         />
                         <span className="task-copy">
                           <span className="task-text">{task.text}</span>
@@ -281,7 +304,7 @@ function App() {
                           className="delete-button"
                           type="button"
                           aria-label={`Delete "${task.text}"`}
-                          onClick={() => deleteTask(task.id)}
+                          onClick={() => removeTask(task.id)}
                         >
                           Delete
                         </button>
