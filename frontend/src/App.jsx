@@ -75,7 +75,11 @@ function App() {
 
   async function toggleTask(task) {
     try {
-      const updatedTask = await updateTodo(task.id, { completed: !task.completed })
+      const updatedTask = await updateTodo(task.id, {
+        text: task.text,
+        notes: task.notes,
+        completed: !task.completed,
+      })
       setTasks((currentTasks) => currentTasks.map((item) => (
         item.id === task.id ? updatedTask : item
       )))
@@ -119,15 +123,19 @@ function App() {
     setEditingNotes('')
   }
 
-  async function saveEdit(event, taskId) {
+  async function saveEdit(event, task) {
     event.preventDefault()
     const text = editingText.trim()
     if (!text) return
 
     try {
-      const updatedTask = await updateTodo(taskId, { text, notes: editingNotes.trim() })
+      const updatedTask = await updateTodo(task.id, {
+        text,
+        notes: editingNotes.trim(),
+        completed: task.completed,
+      })
       setTasks((currentTasks) => currentTasks.map((task) => (
-        task.id === taskId ? updatedTask : task
+        task.id === updatedTask.id ? updatedTask : task
       )))
       setApiError('')
       cancelEditing()
@@ -249,7 +257,7 @@ function App() {
               {visibleTasks.map((task) => (
                 <li className={`task-item${task.completed ? ' is-complete' : ''}`} key={task.id}>
                   {editingTaskId === task.id ? (
-                    <form className="edit-form" onSubmit={(event) => saveEdit(event, task.id)}>
+                    <form className="edit-form" onSubmit={(event) => saveEdit(event, task)}>
                       <label className="edit-field">
                         Task
                         <input
