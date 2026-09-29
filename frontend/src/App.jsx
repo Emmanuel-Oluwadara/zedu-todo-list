@@ -114,7 +114,7 @@ function App() {
   function startEditing(task) {
     setEditingTaskId(task.id)
     setEditingText(task.text)
-    setEditingNotes(task.notes)
+    setEditingNotes(task.notes ?? '')
   }
 
   function cancelEditing() {
@@ -131,7 +131,7 @@ function App() {
     try {
       const updatedTask = await updateTodo(task.id, {
         text,
-        notes: editingNotes.trim(),
+        notes: (editingNotes ?? '').trim(),
         completed: task.completed,
       })
       setTasks((currentTasks) => currentTasks.map((task) => (
