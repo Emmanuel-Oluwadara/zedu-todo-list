@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="theme-color" content="#f3f6f2">
+	<title>Daylist | To-Do List</title>
+	<link rel="stylesheet" href="style.css">
+	<script src="script.js" defer></script>
+</head>
+<body>
+	<header class="site-header">
+		<a class="brand" href="./" aria-label="Daylist home">
+			<span class="brand-mark" aria-hidden="true"></span>
+			<span>daylist</span>
+		</a>
+		<p class="date-label" id="today-date"></p>
+	</header>
+	<main class="app-shell">
+		<section class="task-heading" aria-labelledby="page-title">
+			<div>
+				<p class="eyebrow">PERSONAL LIST</p>
+				<h1 id="page-title">Your tasks<span class="heading-period">.</span></h1>
+			</div>
+			<div class="progress-summary">
+				<p class="task-count" id="task-count" aria-live="polite">0 tasks left</p>
+				<div class="progress-track" id="progress-track" role="progressbar" aria-label="Tasks completed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+					<span class="progress-bar" id="progress-bar"></span>
+				</div>
+				<p class="progress-label" id="progress-label">Ready when you are</p>
+			</div>
+		</section>
+
+		<form class="task-form" id="todo-form">
+			<label class="sr-only" for="task-input">Add a task</label>
+			<input id="task-input" name="task" type="text" placeholder="What needs to get done?" maxlength="160" autocomplete="off" required>
+			<button class="add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
+		</form>
+
+		<section class="task-section" aria-label="Your tasks">
+			<div class="list-toolbar">
+				<div class="filters" role="group" aria-label="Filter tasks">
+					<button class="filter-button" type="button" data-filter="all" aria-pressed="true" aria-controls="todo-list">All</button>
+					<button class="filter-button" type="button" data-filter="active" aria-pressed="false" aria-controls="todo-list">Active</button>
+					<button class="filter-button" type="button" data-filter="completed" aria-pressed="false" aria-controls="todo-list">Completed</button>
+				</div>
+				<button class="clear-completed" id="clear-completed" type="button" disabled>Clear completed</button>
+			</div>
+			<ul class="todo-list" id="todo-list" aria-label="Tasks"></ul>
+			<div class="empty-state" id="empty-state" aria-live="polite" hidden>
+				<p class="empty-title" id="empty-title">No tasks yet</p>
+				<p class="empty-description" id="empty-description">Add your first task to start the list.</p>
+			</div>
+		</section>
+		<footer class="page-footer">
+			<span>DAYLIST</span>
+			<span>Saved on this device</span>
+		</footer>
+	</main>
+</body>
+</html>
