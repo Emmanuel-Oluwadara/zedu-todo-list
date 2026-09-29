@@ -14,7 +14,10 @@ function loadTasks() {
       typeof task.id === 'string' &&
       typeof task.text === 'string' &&
       typeof task.completed === 'boolean'
-    )
+    ).map((task) => ({
+      ...task,
+      notes: typeof task.notes === 'string' ? task.notes : '',
+    }))
   } catch {
     return []
   }
@@ -30,6 +33,10 @@ function App() {
   const [tasks, setTasks] = useState(loadTasks)
   const [filter, setFilter] = useState('all')
   const [taskText, setTaskText] = useState('')
+  const [taskNotes, setTaskNotes] = useState('')
+  const [editingTaskId, setEditingTaskId] = useState(null)
+  const [editingText, setEditingText] = useState('')
+  const [editingNotes, setEditingNotes] = useState('')
   const taskInputRef = useRef(null)
 
   useEffect(() => {
@@ -59,8 +66,14 @@ function App() {
     const text = taskText.trim()
     if (!text) return
 
-    setTasks((currentTasks) => [{ id: createTaskId(), text, completed: false }, ...currentTasks])
+    setTasks((currentTasks) => [{
+      id: createTaskId(),
+      text,
+      notes: taskNotes.trim(),
+      completed: false,
+    }, ...currentTasks])
     setTaskText('')
+    setTaskNotes('')
     setFilter('all')
     taskInputRef.current?.focus()
   }
@@ -73,10 +86,37 @@ function App() {
 
   function deleteTask(taskId) {
     setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId))
+    if (editingTaskId === taskId) setEditingTaskId(null)
   }
 
   function clearCompleted() {
     setTasks((currentTasks) => currentTasks.filter((task) => !task.completed))
+    setEditingTaskId(null)
+  }
+
+  function startEditing(task) {
+    setEditingTaskId(task.id)
+    setEditingText(task.text)
+    setEditingNotes(task.notes)
+  }
+
+  function cancelEditing() {
+    setEditingTaskId(null)
+    setEditingText('')
+    setEditingNotes('')
+  }
+
+  function saveEdit(event, taskId) {
+    event.preventDefault()
+    const text = editingText.trim()
+    if (!text) return
+
+    setTasks((currentTasks) => currentTasks.map((task) => (
+      task.id === taskId
+        ? { ...task, text, notes: editingNotes.trim() }
+        : task
+    )))
+    cancelEditing()
   }
 
   const emptyTitle = tasks.length === 0
@@ -140,6 +180,17 @@ function App() {
             value={taskText}
             onChange={(event) => setTaskText(event.target.value)}
           />
+          <label className="sr-only" htmlFor="task-notes">Notes (optional)</label>
+          <textarea
+            id="task-notes"
+            name="notes"
+            className="task-notes-input"
+            placeholder="Add a note (optional)"
+            maxLength={500}
+            rows={2}
+            value={taskNotes}
+            onChange={(event) => setTaskNotes(event.target.value)}
+          />
           <button className="add-button" type="submit">
             <span aria-hidden="true">+</span> Add task
           </button>
@@ -174,24 +225,69 @@ function App() {
             <ul className="todo-list" aria-label="Tasks">
               {visibleTasks.map((task) => (
                 <li className={`task-item${task.completed ? ' is-complete' : ''}`} key={task.id}>
-                  <label className="task-main">
-                    <input
-                      className="task-checkbox"
-                      type="checkbox"
-                      checked={task.completed}
-                      aria-label={`Mark "${task.text}" as ${task.completed ? 'not complete' : 'complete'}`}
-                      onChange={() => toggleTask(task.id)}
-                    />
-                    <span className="task-text">{task.text}</span>
-                  </label>
-                  <button
-                    className="delete-button"
-                    type="button"
-                    aria-label={`Delete "${task.text}"`}
-                    onClick={() => deleteTask(task.id)}
-                  >
-                    Delete
-                  </button>
+                  {editingTaskId === task.id ? (
+                    <form className="edit-form" onSubmit={(event) => saveEdit(event, task.id)}>
+                      <label className="edit-field">
+                        Task
+                        <input
+                          type="text"
+                          maxLength={160}
+                          required
+                          value={editingText}
+                          onChange={(event) => setEditingText(event.target.value)}
+                        />
+                      </label>
+                      <label className="edit-field">
+                        Notes (optional)
+                        <textarea
+                          rows={2}
+                          maxLength={500}
+                          value={editingNotes}
+                          onChange={(event) => setEditingNotes(event.target.value)}
+                        />
+                      </label>
+                      <div className="edit-actions">
+                        <button className="save-edit-button" type="submit">Save</button>
+                        <button className="cancel-edit-button" type="button" onClick={cancelEditing}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="task-content">
+                      <label className="task-main">
+                        <input
+                          className="task-checkbox"
+                          type="checkbox"
+                          checked={task.completed}
+                          aria-label={`Mark "${task.text}" as ${task.completed ? 'not complete' : 'complete'}`}
+                          onChange={() => toggleTask(task.id)}
+                        />
+                        <span className="task-copy">
+                          <span className="task-text">{task.text}</span>
+                          {task.notes && <span className="task-note">{task.notes}</span>}
+                        </span>
+                      </label>
+                      <div className="task-actions">
+                        <button
+                          className="edit-button"
+                          type="button"
+                          aria-label={`Edit "${task.text}"`}
+                          onClick={() => startEditing(task)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="delete-button"
+                          type="button"
+                          aria-label={`Delete "${task.text}"`}
+                          onClick={() => deleteTask(task.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
